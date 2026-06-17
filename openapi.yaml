@@ -1,0 +1,1058 @@
+openapi: 3.0.3
+info:
+  title: Template Builder API
+  version: 1.0.0
+  description: >
+    Intent-driven, AI-native template builder and document generation API.
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  # --------------------------------------------------------------------
+  # Templates
+  # --------------------------------------------------------------------
+  /v1/templates:
+    get:
+      summary: List templates
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: industry
+          schema:
+            type: string
+        - in: query
+          name: tag
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+    post:
+      summary: Create a new template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateCreateRequest"
+      responses:
+        "201":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  template_id:
+                    type: string
+                    format: uuid
+
+  /v1/templates/{templateId}:
+    get:
+      summary: Get a template
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+    put:
+      summary: Update a template
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateUpdateRequest"
+      responses:
+        "200":
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+
+  /v1/templates/{templateId}/publish:
+    post:
+      summary: Publish a template (create version)
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                change_summary:
+                  type: string
+      responses:
+        "201":
+          description: Version created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version_id:
+                    type: string
+                    format: uuid
+                  version_number:
+                    type: integer
+
+  /v1/templates/{templateId}/placeholders:
+    get:
+      summary: List placeholders bound to a template
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Template placeholder bindings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TemplatePlaceholderBinding"
+    post:
+      summary: Bind a registry placeholder to a template
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplatePlaceholderBindingCreateRequest"
+      responses:
+        "201":
+          description: Binding created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplatePlaceholderBinding"
+
+  /v1/templates/{templateId}/validate:
+    post:
+      summary: Validate a template (structure, tokens, tests)
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateValidationResult"
+
+  /v1/templates/{templateId}/tests:
+    post:
+      summary: Create a test case for a template
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateTestCreateRequest"
+      responses:
+        "201":
+          description: Test created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateTest"
+
+  /v1/templates/{templateId}/tests/run:
+    post:
+      summary: Run tests for a template
+      parameters:
+        - in: path
+          name: templateId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Test run results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TemplateTestResult"
+
+  # --------------------------------------------------------------------
+  # Placeholder Registry
+  # --------------------------------------------------------------------
+  /v1/registry/placeholders:
+    get:
+      summary: List placeholder registry entries
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+        - in: query
+          name: datasource_id
+          schema:
+            type: integer
+        - in: query
+          name: classification
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of placeholders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlaceholderRegistryEntry"
+    post:
+      summary: Create a placeholder registry entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceholderRegistryCreateRequest"
+      responses:
+        "201":
+          description: Placeholder created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceholderRegistryEntry"
+
+  # --------------------------------------------------------------------
+  # Runtime Document Generation
+  # --------------------------------------------------------------------
+  /v1/documents/generate:
+    post:
+      summary: Generate a document from a template
+      description: >
+        Main runtime endpoint for n8n and applications. Supports manual SQL
+        and AI prompt placeholders.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentGenerateRequest"
+      responses:
+        "200":
+          description: Document generation result (sync or async)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DocumentGenerateSyncResponse"
+                  - $ref: "#/components/schemas/DocumentGenerateAsyncResponse"
+
+  /v1/documents/jobs/{jobId}:
+    get:
+      summary: Get render job status/result
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Render job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderJobStatus"
+
+  # --------------------------------------------------------------------
+  # Intent ↔ Template (Phase 2)
+  # --------------------------------------------------------------------
+  /v1/intents/{intentId}/templates:
+    get:
+      summary: List templates mapped to an intent
+      parameters:
+        - in: path
+          name: intentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Templates for the intent
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntentTemplateMapping"
+
+  # --------------------------------------------------------------------
+  # AI Design APIs (Phase 3)
+  # --------------------------------------------------------------------
+  /v1/ai/templates/from-upload:
+    post:
+      summary: Create template from uploaded document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                metadata:
+                  type: string
+                  description: JSON string with template metadata (name, output_target, industry, locale)
+      responses:
+        "202":
+          description: Upload accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upload_id:
+                    type: string
+                    format: uuid
+                  template_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  extraction_status:
+                    type: string
+
+  /v1/uploads/{uploadId}:
+    get:
+      summary: Get uploaded document extraction status
+      parameters:
+        - in: path
+          name: uploadId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Upload status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedDocument"
+
+  /v1/ai/layout/suggest:
+    post:
+      summary: Suggest a template layout using AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiLayoutSuggestRequest"
+      responses:
+        "200":
+          description: Suggested layout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiLayoutSuggestResponse"
+
+  /v1/ai/table-layout/suggest:
+    post:
+      summary: Suggest a table block layout for a dataset placeholder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiTableLayoutSuggestRequest"
+      responses:
+        "200":
+          description: Suggested table block
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiTableLayoutSuggestResponse"
+
+  /v1/ai/text/polish:
+    post:
+      summary: Polish the style/tone of a text block
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiTextPolishRequest"
+      responses:
+        "200":
+          description: Polished text suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiTextPolishResponse"
+
+  /v1/ai/text/translate:
+    post:
+      summary: Translate a text block into another locale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiTextTranslateRequest"
+      responses:
+        "200":
+          description: Translated text suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiTextTranslateResponse"
+
+  /v1/ai/analyze/anomalies:
+    post:
+      summary: Analyze a rendered document for anomalies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiAnomaliesRequest"
+      responses:
+        "200":
+          description: Anomaly analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAnomaliesResponse"
+
+  # --------------------------------------------------------------------
+  # Marketplace (Phase 4)
+  # --------------------------------------------------------------------
+  /v1/marketplace:
+    get:
+      summary: List marketplace items
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [template, block, placeholder]
+        - in: query
+          name: tag
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marketplace items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketplaceItem"
+    post:
+      summary: Publish an item to the marketplace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketplacePublishRequest"
+      responses:
+        "201":
+          description: Marketplace item created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceItem"
+
+  /v1/marketplace/import:
+    post:
+      summary: Import a marketplace item into the account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketplaceImportRequest"
+      responses:
+        "201":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported_id:
+                    type: string
+                    format: uuid
+
+components:
+  schemas:
+    Template:
+      type: object
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        output_target:
+          type: string
+          enum: [html, docx, pdf, xlsx, md]
+        layout_json:
+          type: object
+        default_locale:
+          type: string
+        supported_locales:
+          type: array
+          items:
+            type: string
+        industry:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TemplateCreateRequest:
+      type: object
+      required: [name, output_target, layout_json]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        output_target:
+          type: string
+          enum: [html, docx, pdf, xlsx, md]
+        layout_json:
+          type: object
+        default_locale:
+          type: string
+          default: en
+        supported_locales:
+          type: array
+          items:
+            type: string
+        industry:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    TemplateUpdateRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        status:
+          type: string
+        layout_json:
+          type: object
+        supported_locales:
+          type: array
+          items:
+            type: string
+        industry:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    PlaceholderRegistryEntry:
+      type: object
+      properties:
+        registry_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        generation_mode:
+          type: string
+          enum: [manual_sql, llm_prompt]
+        prompt:
+          type: string
+        sql_text:
+          type: string
+        datasource_id:
+          type: integer
+        value_type:
+          type: string
+        cardinality:
+          type: string
+        classification:
+          type: string
+        format_json:
+          type: object
+        sample_value:
+          type: string
+        metadata:
+          type: object
+        created_by:
+          type: string
+
+    PlaceholderRegistryCreateRequest:
+      type: object
+      required: [name, generation_mode, datasource_id]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        generation_mode:
+          type: string
+          enum: [manual_sql, llm_prompt]
+        prompt:
+          type: string
+        sql_text:
+          type: string
+        datasource_id:
+          type: integer
+        value_type:
+          type: string
+          default: string
+        cardinality:
+          type: string
+          default: scalar
+        classification:
+          type: string
+          default: internal
+        format_json:
+          type: object
+        sample_value:
+          type: string
+        metadata:
+          type: object
+
+    TemplatePlaceholderBinding:
+      type: object
+      properties:
+        template_placeholder_id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+          format: uuid
+        registry_id:
+          type: string
+          format: uuid
+        override_prompt:
+          type: string
+        override_sql_text:
+          type: string
+        override_format:
+          type: object
+        override_datasource_id:
+          type: integer
+        override_sample_value:
+          type: string
+        metadata:
+          type: object
+
+    TemplatePlaceholderBindingCreateRequest:
+      type: object
+      required: [registry_id]
+      properties:
+        registry_id:
+          type: string
+          format: uuid
+        override_prompt:
+          type: string
+        override_sql_text:
+          type: string
+        override_format:
+          type: object
+        override_datasource_id:
+          type: integer
+        override_sample_value:
+          type: string
+        metadata:
+          type: object
+
+    DocumentGenerateRequest:
+      type: object
+      required: [template_id, output_target]
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        version_id:
+          type: string
+          format: uuid
+          nullable: true
+        locale:
+          type: string
+          default: en
+        output_target:
+          type: string
+          enum: [html, docx, pdf, xlsx, md]
+        runtime_params:
+          type: object
+          additionalProperties: true
+
+    DocumentGenerateSyncResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        output_target:
+          type: string
+        content_base64:
+          type: string
+
+    DocumentGenerateAsyncResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [queued]
+        job_id:
+          type: string
+          format: uuid
+
+    RenderJobStatus:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, success, error]
+        output_target:
+          type: string
+        result_location:
+          type: string
+        logs:
+          type: string
+
+    IntentTemplateMapping:
+      type: object
+      properties:
+        intent_id:
+          type: integer
+        template_id:
+          type: string
+          format: uuid
+        is_primary:
+          type: boolean
+        rank:
+          type: integer
+
+    UploadedDocument:
+      type: object
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
+        original_filename:
+          type: string
+        mime_type:
+          type: string
+        storage_uri:
+          type: string
+        extraction_status:
+          type: string
+          enum: [pending, success, failed]
+        extracted_layout:
+          type: object
+        extraction_errors:
+          type: object
+
+    AiLayoutSuggestRequest:
+      type: object
+      properties:
+        intent_id:
+          type: integer
+          nullable: true
+        description:
+          type: string
+
+    AiLayoutSuggestResponse:
+      type: object
+      properties:
+        layout_json:
+          type: object
+
+    AiTableLayoutSuggestRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        placeholder_id:
+          type: string
+          format: uuid
+        user_preferences:
+          type: string
+
+    AiTableLayoutSuggestResponse:
+      type: object
+      properties:
+        table_block:
+          type: object
+
+    AiTextPolishRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        block_id:
+          type: string
+        style:
+          type: string
+          description: desired style, e.g. "formal", "simple", "legal"
+
+    AiTextPolishResponse:
+      type: object
+      properties:
+        suggested_text:
+          type: string
+
+    AiTextTranslateRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        block_id:
+          type: string
+        target_locale:
+          type: string
+
+    AiTextTranslateResponse:
+      type: object
+      properties:
+        translated_text:
+          type: string
+
+    AiAnomaliesRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        rendered_content:
+          type: string
+          description: base64-encoded or raw HTML/text content
+        context:
+          type: object
+          additionalProperties: true
+
+    AiAnomaliesResponse:
+      type: object
+      properties:
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              severity:
+                type: string
+                enum: [info, warning, error]
+              message:
+                type: string
+
+    TemplateValidationResult:
+      type: object
+      properties:
+        is_valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+
+    TemplateTestCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        runtime_params:
+          type: object
+        expected_checks:
+          type: object
+
+    TemplateTest:
+      type: object
+      properties:
+        test_id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        runtime_params:
+          type: object
+        expected_checks:
+          type: object
+
+    TemplateTestResult:
+      type: object
+      properties:
+        test_id:
+          type: string
+          format: uuid
+        passed:
+          type: boolean
+        details:
+          type: string
+
+    MarketplaceItem:
+      type: object
+      properties:
+        item_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+        license:
+          type: string
+        rating:
+          type: number
+          format: float
+        downloads:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        is_public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    MarketplacePublishRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [template, block, placeholder]
+        source_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        license:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    MarketplaceImportRequest:
+      type: object
+      properties:
+        item_id:
+          type: string
+          format: uuid

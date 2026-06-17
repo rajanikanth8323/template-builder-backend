@@ -1,0 +1,20 @@
+datasource_id: loan_db_uuid
+entities:
+  Customer:
+    fields:
+      - name: customer_id
+        type: uuid
+      - name: full_name
+        type: string
+      - name: email
+        type: string
+  Loan:
+    fields:
+      - name: loan_id
+        type: uuid
+      - name: principal
+        type: numeric
+      - name: interest_rate
+        type: numeric
+      - name: maturity_date
+        type: date

@@ -1,0 +1,113 @@
+version: "3.8"
+
+services:
+  # ── API ──────────────────────────────────────────────────────
+  api:
+    build: .
+    ports:
+      - "10001:8080"
+    environment:
+      DATABASE_URL: ${DB_URL}
+      REDIS_URL: ${REDIS_URL}
+      API_PORT: ${API_PORT}
+      KASETTI_DS_URL: ${KASETTI_DS_URL}
+      COHERE_API_KEY: ${COHERE_API_KEY}
+      GOOGLE_TRANSLATE_KEY: ${GOOGLE_TRANSLATE_KEY}
+      LLM_ENDPOINT: ${LLM_ENDPOINT:-}
+      LLM_WEBHOOK_URL: "https://webhook.site/1e6163d3-e567-4372-9031-356976ca50c2"
+    depends_on:
+      db:
+        condition: service_healthy
+      kasetti-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - tbnet
+      - internet
+    restart: on-failure
+
+  # ── WORKER ───────────────────────────────────────────────────
+  worker:
+    build: .
+    command: ["python", "-m", "src.worker"]
+    environment:
+      DATABASE_URL: ${DB_URL}
+      KASETTI_DS_URL: ${KASETTI_DS_URL}
+      COHERE_API_KEY: ${COHERE_API_KEY}
+      GOOGLE_TRANSLATE_KEY: ${GOOGLE_TRANSLATE_KEY}
+      LLM_WEBHOOK_URL: "https://webhook.site/1e6163d3-e567-4372-9031-356976ca50c2"
+      MAX_CONCURRENT_RENDERS: "3"
+      POLL_INTERVAL_SEC: "1"
+      PDF_CONCURRENCY: "2"
+      RESULT_DIR: "/app/results"
+    depends_on:
+      db:
+        condition: service_healthy
+      kasetti-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - tbnet
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  # ── Template Builder DB ───────────────────────────────────────
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: template_builder
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - tbnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d template_builder"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Kasetti Bank Datasource DB ────────────────────────────────
+  kasetti-db:
+    image: postgres:15
+    container_name: kasetti-datasource-postgres
+    environment:
+      POSTGRES_USER: eivsdemo
+      POSTGRES_PASSWORD: eivsdemo
+      POSTGRES_DB: kasetti_bank
+    ports:
+      - "5433:5432"
+    volumes:
+      - kasetti-ds-pgdata:/var/lib/postgresql/data
+      - ./sql/kasetti-db:/docker-entrypoint-initdb.d:ro
+    networks:
+      - tbnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eivsdemo -d kasetti_bank"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ── Redis ─────────────────────────────────────────────────────
+  redis:
+    image: redis:7
+    networks:
+      - tbnet
+
+networks:
+  tbnet:
+    driver: bridge
+  internet:
+    driver: bridge
+
+volumes:
+  db_data:
+  kasetti-ds-pgdata:
